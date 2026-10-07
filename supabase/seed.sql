@@ -1,0 +1,1 @@
+-- Add local demonstration records here when the frontend Supabase adapter is enabled.

@@ -1,0 +1,26 @@
+@import url('https://fonts.googleapis.com/css2?family=Barlow+Condensed:ital,wght@0,700;0,800;0,900;1,800&family=Inter:wght@400;500;600;700;800&display=swap');
+
+:root {
+  font-family: Inter, system-ui, sans-serif;
+  color: oklch(0.93 0.006 250);
+  background: oklch(0.12 0.015 250);
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  --ink: oklch(0.12 0.015 250);
+  --surface: oklch(0.16 0.017 250);
+  --raised: oklch(0.2 0.018 250);
+  --line: oklch(0.28 0.02 250);
+  --muted: oklch(0.68 0.018 250);
+  --paper: oklch(0.94 0.008 250);
+  --pink: oklch(0.65 0.27 350);
+  --blue: oklch(0.68 0.18 240);
+  --green: oklch(0.75 0.15 155);
+  --red: oklch(0.65 0.22 25);
+}
+* { box-sizing: border-box; }
+body { margin: 0; min-width: 320px; min-height: 100vh; background: var(--ink); }
+button, input, select, textarea { font: inherit; }
+button { cursor: pointer; }
+button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
+h1, h2, p { margin-top: 0; }
+#root { min-height: 100vh; }
