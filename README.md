@@ -31,7 +31,16 @@ VITE_SUPABASE_ANON_KEY=<the anon key printed by npm run backend:status>
 
 Then run `npm run dev`.
 
-Open Supabase Studio at <http://127.0.0.1:54323>, go to **Authentication → Users**, and create an email/password user with automatic confirmation enabled. Sign in to the app with that user. On first login, the app asks for the competition details and creates the database workspace automatically.
+Create the single local staff user with the service-role key printed by `npm run backend:status`:
+
+```bash
+SUPABASE_URL=http://127.0.0.1:54321 \
+SUPABASE_SERVICE_ROLE_KEY=PASTE_LOCAL_SERVICE_ROLE_KEY \
+CF100_PASSWORD=bulgherelli \
+npm run staff:create
+```
+
+Then sign in with username `cf100`. On first login, the app asks for the competition details and creates the database workspace automatically. The staff session lasts three hours and survives page refreshes.
 
 Use Studio's **Table Editor** to inspect the data. `backend:reset` deletes local database data and reapplies every migration.
 
@@ -48,8 +57,17 @@ Use Studio's **Table Editor** to inspect the data. `backend:reset` deletes local
    npx supabase db push
    ```
 
-3. In Supabase, open **Authentication → Users → Add user**. Create the gym staff account and enable automatic confirmation.
-4. In **Project Settings → API**, copy the project URL and the publishable/anonymous key. Never put the `service_role` key in the frontend.
+3. In **Project Settings → API**, copy the project URL, publishable/anonymous key, and service-role key. Never put the service-role key in the frontend or Cloudflare.
+4. Create the only staff user locally from your terminal:
+
+   ```bash
+   SUPABASE_URL=https://YOUR_PROJECT.supabase.co \
+   SUPABASE_SERVICE_ROLE_KEY=YOUR_SERVICE_ROLE_KEY \
+   CF100_PASSWORD=bulgherelli \
+   npm run staff:create
+   ```
+
+5. In **Authentication → Settings**, disable new-user signups. The app and database also restrict administration to the internal identity `cf100@cf100.app`.
 
 ### 2. Deploy the frontend on Cloudflare Pages
 
@@ -61,7 +79,7 @@ Use Studio's **Table Editor** to inspect the data. `backend:reset` deletes local
 
 ### 3. First use
 
-1. Open the Cloudflare URL and sign in with the staff user.
+1. Open the Cloudflare URL and sign in with username `cf100` and the configured password.
 2. Complete the first-run competition form.
 3. Add teams and WODs, then configure points under **WODs**.
 4. In **Settings**, change status from **Draft** to **Live**.
@@ -77,4 +95,6 @@ npm run backend:stop
 ```
 
 The Supabase migrations provide row-level security, staff membership, public read-only live-event access, four lanes per heat, score audit records, and realtime score publication.
+
+Staff pages use paths such as `/teams`, `/wods`, and `/floor`, so refreshing or using the browser back button preserves the current section. Missing or expired authentication redirects to `/login`; successful login returns to the originally requested page.
 # cf100

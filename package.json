@@ -12,7 +12,8 @@
     "backend:start": "supabase start",
     "backend:stop": "supabase stop",
     "backend:status": "supabase status",
-    "backend:reset": "supabase db reset"
+    "backend:reset": "supabase db reset",
+    "staff:create": "node scripts/create-staff-user.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.117.2",

@@ -11,6 +11,7 @@ language plpgsql security definer set search_path = '' as $$
 declare new_id uuid;
 begin
   if auth.uid() is null then raise exception 'Authentication required'; end if;
+  if coalesce(auth.jwt() ->> 'email', '') <> 'cf100@cf100.app' then raise exception 'Only the CF100 staff account is authorized'; end if;
   insert into public.competitions (name, event_date, location, status, public_slug)
   values (competition_name, competition_date, competition_location, 'draft', competition_slug)
   returning id into new_id;
@@ -25,6 +26,7 @@ create or replace function public.save_competition_snapshot(target_id uuid, payl
 returns void language plpgsql security definer set search_path = '' as $$
 declare item jsonb; member jsonb; lane jsonb;
 begin
+  if coalesce(auth.jwt() ->> 'email', '') <> 'cf100@cf100.app' then raise exception 'Only the CF100 staff account is authorized'; end if;
   if not public.is_competition_staff(target_id) then raise exception 'Not authorized'; end if;
 
   update public.competitions set

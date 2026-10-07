@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import type { FormEvent } from 'react'
 import { Activity, Check, ChevronRight, CircleDot, Clock3, Copy, Dumbbell, Gauge, LayoutDashboard, ListOrdered, Menu, Pencil, Plus, RotateCcw, Settings, ShieldCheck, Trash2, Trophy, Users, X } from 'lucide-react'
 import './App.css'
@@ -17,14 +17,31 @@ const navItems: Array<{ id: View; label: string; icon: typeof Gauge }> = [
   { id: 'leaderboard', label: 'Leaderboard', icon: Trophy }, { id: 'settings', label: 'Settings', icon: Settings },
 ]
 const scoreLabels: Record<ScoreType, string> = { 'for-time': 'For time', amrap: 'AMRAP / reps', 'max-load': 'Max load' }
+const pathToView = (path: string): View => navItems.some((item) => `/${item.id}` === path) ? path.slice(1) as View : 'overview'
 
 function App() {
   const competition = useCompetition()
   const { state, setState, reset } = competition
-  const [view, setView] = useState<View>('overview')
+  const [view, setView] = useState<View>(() => pathToView(window.location.pathname))
   const [menuOpen, setMenuOpen] = useState(false)
   const leaderboard = useMemo(() => buildLeaderboard(state), [state])
-  const navigate = (next: View) => { setView(next); setMenuOpen(false) }
+  const navigate = (next: View) => { window.history.pushState({}, '', `/${next}`); setView(next); setMenuOpen(false) }
+  useEffect(() => {
+    const restore = () => setView(pathToView(window.location.pathname))
+    window.addEventListener('popstate', restore)
+    return () => window.removeEventListener('popstate', restore)
+  }, [])
+  useEffect(() => {
+    if (competition.readOnly || !competition.remoteConfigured) return
+    if (!competition.session && window.location.pathname !== '/login') {
+      const next = window.location.pathname === '/' ? '/overview' : window.location.pathname
+      window.history.replaceState({}, '', `/login?next=${encodeURIComponent(next)}`)
+    } else if (competition.session && window.location.pathname === '/login') {
+      const next = new URLSearchParams(window.location.search).get('next') || '/overview'
+      window.history.replaceState({}, '', next)
+      setView(pathToView(next))
+    }
+  }, [competition.readOnly, competition.remoteConfigured, competition.session])
   if (competition.loading) return <LoadingScreen />
   if (competition.readOnly) return competition.error ? <AuthMessage title="Leaderboard unavailable" message={competition.error} /> : <LeaderboardView state={state} />
   if (competition.remoteConfigured && !competition.session) return <LoginScreen signIn={competition.signIn} />
@@ -54,10 +71,10 @@ function LoadingScreen() { return <div className="auth-shell"><div className="au
 
 function AuthMessage({ title, message }: { title: string; message: string }) { return <div className="auth-shell"><section className="auth-panel"><small>CF100 Competition desk</small><h1>{title}</h1><p>{message}</p></section></div> }
 
-function LoginScreen({ signIn }: { signIn: (email: string, password: string) => Promise<string> }) {
-  const [email, setEmail] = useState(''), [password, setPassword] = useState(''), [message, setMessage] = useState(''), [busy, setBusy] = useState(false)
-  async function submit(event: FormEvent) { event.preventDefault(); setBusy(true); setMessage(await signIn(email, password)); setBusy(false) }
-  return <div className="auth-shell"><section className="auth-panel"><div className="auth-brand"><span className="brand-mark"><b>CF</b><strong>100</strong></span><small>Staff access</small></div><h1>Competition desk</h1><p>Sign in with the staff account created in Supabase.</p><form onSubmit={submit}><label>Email<input type="email" value={email} onChange={(event) => setEmail(event.target.value)} required /></label><label>Password<input type="password" value={password} onChange={(event) => setPassword(event.target.value)} required /></label>{message && <div className="auth-error">{message}</div>}<button className="primary large" disabled={busy}>{busy ? 'Signing in…' : 'Sign in'} <ChevronRight /></button></form></section></div>
+function LoginScreen({ signIn }: { signIn: (username: string, password: string) => Promise<string> }) {
+  const [password, setPassword] = useState(''), [message, setMessage] = useState(''), [busy, setBusy] = useState(false)
+  async function submit(event: FormEvent) { event.preventDefault(); setBusy(true); setMessage(await signIn('cf100', password)); setBusy(false) }
+  return <div className="auth-shell"><section className="auth-panel"><div className="auth-brand"><span className="brand-mark"><b>CF</b><strong>100</strong></span><small>Staff access</small></div><h1>Competition desk</h1><p>Sign in to manage the event. Your session remains valid for three hours.</p><form onSubmit={submit}><label>Username<input value="cf100" readOnly /></label><label>Password<input autoFocus type="password" value={password} onChange={(event) => setPassword(event.target.value)} required /></label>{message && <div className="auth-error">{message}</div>}<button className="primary large" disabled={busy}>{busy ? 'Signing in…' : 'Sign in'} <ChevronRight /></button></form></section></div>
 }
 
 function CompetitionSetup({ onSubmit }: { onSubmit: (name: string, date: string, location: string) => Promise<void> }) {
@@ -181,7 +198,7 @@ function LeaderboardView({ state }: { state: CompetitionState }) {
 
 function SettingsView({ state, setState, reset }: StateProps & { reset: () => void }) {
   const [copied, setCopied] = useState(false)
-  const publicUrl = state.competition.publicSlug ? `${window.location.origin}${window.location.pathname}?event=${state.competition.publicSlug}` : ''
+  const publicUrl = state.competition.publicSlug ? `${window.location.origin}/leaderboard?event=${state.competition.publicSlug}` : ''
   async function copyPublicUrl() { await navigator.clipboard.writeText(publicUrl); setCopied(true); window.setTimeout(() => setCopied(false), 1800) }
   return <div className="page settings-page"><PageHeading eyebrow="Competition" title="Event settings" /><section className="settings-form panel"><label>Competition name<input value={state.competition.name} onChange={(e) => setState((current) => ({ ...current, competition: { ...current.competition, name: e.target.value } }))} /></label><label>Location<input value={state.competition.location} onChange={(e) => setState((current) => ({ ...current, competition: { ...current.competition, location: e.target.value } }))} /></label><label>Date<input type="date" value={state.competition.date} onChange={(e) => setState((current) => ({ ...current, competition: { ...current.competition, date: e.target.value } }))} /></label><label>Status<select value={state.competition.status} onChange={(e) => setState((current) => ({ ...current, competition: { ...current.competition, status: e.target.value as CompetitionState['competition']['status'] } }))}><option value="draft">Draft</option><option value="live">Live</option><option value="complete">Complete</option></select></label></section>{publicUrl && <section className="public-share panel"><div><small>Audience link</small><h2>Public leaderboard</h2><p>Set the event to Live, then share this read-only link. Scores refresh automatically.</p></div><div className="share-row"><input readOnly value={publicUrl} aria-label="Public leaderboard URL" /><button className="secondary" onClick={() => void copyPublicUrl()}>{copied ? <Check /> : <Copy />}{copied ? 'Copied' : 'Copy link'}</button></div></section>}<section className="danger-zone"><div><h2>Reset demonstration data</h2><p>Restores sample teams, WODs, heats, and scores on this device.</p></div><button className="danger" onClick={reset}><RotateCcw /> Reset data</button></section></div>
 }
