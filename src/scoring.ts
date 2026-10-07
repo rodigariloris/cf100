@@ -37,28 +37,29 @@ export function buildLeaderboard(state: CompetitionState): RankedTeam[] {
     wodResults: {} as RankedTeam['wodResults'],
   }))
 
+  const divisions = [...new Set(ranked.map((team) => `${team.gender}:${team.category}`))]
   for (const wod of state.wods) {
-    const eventScores = state.scores
-      .filter((score) => score.wodId === wod.id)
-      .sort((a, b) => compareScores(a, b, wod))
-
-    let previousPlace = 0
-    eventScores.forEach((score, index) => {
-      const team = ranked.find((candidate) => candidate.id === score.teamId)
-      if (!team) return
-      const place = index > 0 && scoresAreTied(score, eventScores[index - 1], wod)
-        ? previousPlace
-        : index + 1
-      previousPlace = place
-      const points = score.status === 'dns' ? 0 : (state.points[place - 1] ?? 0)
-      team.totalPoints += points
-      team.scoredEvents += 1
-      if (place === 1) team.eventWins += 1
-      team.wodResults[wod.id] = { place, points, score }
-    })
+    for (const division of divisions) {
+      const divisionTeamIds = new Set(ranked.filter((team) => `${team.gender}:${team.category}` === division).map((team) => team.id))
+      const eventScores = state.scores.filter((score) => score.wodId === wod.id && divisionTeamIds.has(score.teamId)).sort((a, b) => compareScores(a, b, wod))
+      let previousPlace = 0
+      eventScores.forEach((score, index) => {
+        const team = ranked.find((candidate) => candidate.id === score.teamId)
+        if (!team) return
+        const place = index > 0 && scoresAreTied(score, eventScores[index - 1], wod) ? previousPlace : index + 1
+        previousPlace = place
+        const points = score.status === 'dns' ? 0 : (state.points[place - 1] ?? 0)
+        team.totalPoints += points
+        team.scoredEvents += 1
+        if (place === 1) team.eventWins += 1
+        team.wodResults[wod.id] = { place, points, score }
+      })
+    }
   }
 
   ranked.sort((a, b) =>
+    a.gender.localeCompare(b.gender) ||
+    a.category.localeCompare(b.category) ||
     b.totalPoints - a.totalPoints ||
     b.eventWins - a.eventWins ||
     b.scoredEvents - a.scoredEvents ||
@@ -67,11 +68,13 @@ export function buildLeaderboard(state: CompetitionState): RankedTeam[] {
   ranked.forEach((team, index) => {
     const previous = ranked[index - 1]
     team.position = previous &&
+      team.gender === previous.gender &&
+      team.category === previous.category &&
       team.totalPoints === previous.totalPoints &&
       team.eventWins === previous.eventWins &&
       team.scoredEvents === previous.scoredEvents
       ? previous.position
-      : index + 1
+      : ranked.slice(0, index).filter((candidate) => candidate.gender === team.gender && candidate.category === team.category).length + 1
   })
   return ranked
 }

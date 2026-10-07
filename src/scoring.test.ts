@@ -4,7 +4,7 @@ import type { CompetitionState } from './types'
 
 describe('competition scoring', () => {
   it('assigns tied teams the same place and skips the next place', () => {
-    const team = (id: string) => ({ id, name: id, active: true, participants: [] })
+    const team = (id: string) => ({ id, name: id, active: true, gender: 'mixed' as const, category: 'open' as const, participants: [] })
     const state: CompetitionState = {
       competition: { name: 'Test', date: '2026-10-07', location: '', status: 'live' },
       teams: [team('alpha'), team('bravo'), team('charlie'), team('delta')],
@@ -29,7 +29,7 @@ describe('competition scoring', () => {
   })
 
   it('ranks finishers before capped teams and capped teams by completed reps', () => {
-    const team = (id: string) => ({ id, name: id, active: true, participants: [] })
+    const team = (id: string) => ({ id, name: id, active: true, gender: 'mixed' as const, category: 'open' as const, participants: [] })
     const state: CompetitionState = {
       competition: { name: 'Test', date: '2026-10-07', location: '', status: 'live' },
       teams: [team('finisher'), team('more-reps'), team('fewer-reps')],
@@ -46,5 +46,28 @@ describe('competition scoring', () => {
     const results = buildLeaderboard(state)
     expect(results.map((result) => result.id)).toEqual(['finisher', 'more-reps', 'fewer-reps'])
     expect(results.map((result) => result.wodResults.wod.place)).toEqual([1, 2, 3])
+  })
+
+  it('ranks and awards points independently inside each division', () => {
+    const state: CompetitionState = {
+      competition: { name: 'Test', date: '2026-10-07', location: '', status: 'live' },
+      teams: [
+        { id: 'men', name: 'Men', active: true, gender: 'men', category: 'open', participants: [] },
+        { id: 'women', name: 'Women', active: true, gender: 'women', category: 'open', participants: [] },
+      ],
+      wods: [{ id: 'wod', name: 'Sprint', description: '', type: 'for-time' }],
+      scores: [
+        { id: '1', teamId: 'men', wodId: 'wod', status: 'scored', value: 100, submittedAt: '2026-10-07T08:00:00Z' },
+        { id: '2', teamId: 'women', wodId: 'wod', status: 'scored', value: 120, submittedAt: '2026-10-07T08:01:00Z' },
+      ],
+      heats: [],
+      points: [100, 90],
+    }
+
+    const results = buildLeaderboard(state)
+    expect(results.map((team) => ({ id: team.id, place: team.wodResults.wod.place, points: team.totalPoints }))).toEqual([
+      { id: 'men', place: 1, points: 100 },
+      { id: 'women', place: 1, points: 100 },
+    ])
   })
 })

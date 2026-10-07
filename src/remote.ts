@@ -1,5 +1,5 @@
 import { supabase } from './supabase'
-import type { CompetitionState, ScoreStatus, ScoreType } from './types'
+import type { CompetitionState, ScoreStatus, ScoreType, TeamCategory, TeamGender } from './types'
 
 export async function loadCompetition(idOrSlug: string, bySlug = false): Promise<CompetitionState> {
   if (!supabase) throw new Error('Supabase is not configured')
@@ -20,7 +20,7 @@ export async function loadCompetition(idOrSlug: string, bySlug = false): Promise
   ])
   return {
     competition: { id, name: competition.name, date: competition.event_date, location: competition.location, status: competition.status, publicSlug: competition.public_slug },
-    teams: (teams ?? []).map((team) => ({ id: team.id, name: team.name, active: team.active, participants: (team.participants ?? []).sort((a: { sort_order: number }, b: { sort_order: number }) => a.sort_order - b.sort_order).map((participant: { id: string; name: string }) => ({ id: participant.id, name: participant.name })) })),
+    teams: (teams ?? []).map((team) => ({ id: team.id, name: team.name, active: team.active, gender: (team.gender ?? 'mixed') as TeamGender, category: (team.category ?? 'open') as TeamCategory, participants: (team.participants ?? []).sort((a: { sort_order: number }, b: { sort_order: number }) => a.sort_order - b.sort_order).map((participant: { id: string; name: string }) => ({ id: participant.id, name: participant.name })) })),
     wods: (wods ?? []).map((wod) => ({ id: wod.id, name: wod.name, description: wod.description, type: wod.score_type as ScoreType, capSeconds: wod.cap_seconds ?? undefined })),
     points: (points ?? []).map((point) => point.points),
     heats: (heats ?? []).map((heat) => ({ id: heat.id, wodId: heat.wod_id, number: heat.heat_number, status: heat.status, laneTeamIds: Array.from({ length: 4 }, (_, index) => heat.heat_lanes?.find((lane: { lane_number: number }) => lane.lane_number === index + 1)?.team_id ?? null) })),
@@ -37,6 +37,8 @@ export async function saveCompetition(state: CompetitionState) {
   }
   const { error } = await supabase.rpc('save_competition_snapshot', { target_id: state.competition.id, payload })
   if (error) throw error
+  const { error: divisionError } = await supabase.from('teams').upsert(state.teams.map((team) => ({ id: team.id, competition_id: state.competition.id!, name: team.name, active: team.active, gender: team.gender, category: team.category })))
+  if (divisionError) throw divisionError
 }
 
 export async function createCompetition(name: string, date: string, location: string) {

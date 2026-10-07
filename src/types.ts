@@ -1,5 +1,7 @@
 export type ScoreType = 'for-time' | 'amrap' | 'max-load'
 export type ScoreStatus = 'scored' | 'capped' | 'dns'
+export type TeamGender = 'men' | 'women' | 'mixed'
+export type TeamCategory = 'experience' | 'open'
 
 export interface Participant {
   id: string
@@ -11,6 +13,8 @@ export interface Team {
   name: string
   participants: Participant[]
   active: boolean
+  gender: TeamGender
+  category: TeamCategory
 }
 
 export interface Wod {
