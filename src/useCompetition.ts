@@ -8,7 +8,6 @@ import type { CompetitionState } from './types'
 const STORAGE_KEY = 'cf100-competition-v1'
 const SESSION_DEADLINE_KEY = 'cf100-session-deadline'
 const SESSION_LENGTH_MS = 3 * 60 * 60 * 1000
-const STAFF_EMAIL = 'cf100@cf100.app'
 const publicSlug = new URLSearchParams(window.location.search).get('event')
 
 function loadLocalState() {
@@ -80,7 +79,7 @@ export function useCompetition() {
     return () => { void client.removeChannel(channel) }
   }, [readOnly, state.competition.id])
 
-  const signIn = async (username: string, password: string) => { if (!supabase) return 'Supabase is not configured'; if (username.toLowerCase() !== 'cf100') return 'Invalid username or password'; const { error: signInError } = await supabase.auth.signInWithPassword({ email: STAFF_EMAIL, password }); if (!signInError) localStorage.setItem(SESSION_DEADLINE_KEY, String(Date.now() + SESSION_LENGTH_MS)); return signInError ? 'Invalid username or password' : '' }
+  const signIn = async (email: string, password: string) => { if (!supabase) return 'Supabase is not configured'; const { error: signInError } = await supabase.auth.signInWithPassword({ email, password }); if (!signInError) localStorage.setItem(SESSION_DEADLINE_KEY, String(Date.now() + SESSION_LENGTH_MS)); return signInError ? 'Invalid email or password' : '' }
   const signOut = async () => { localStorage.removeItem(SESSION_DEADLINE_KEY); await supabase?.auth.signOut() }
   const setupCompetition = async (name: string, date: string, location: string) => { const id = await createCompetition(name, date, location); await hydrate(id) }
   const reset = () => { localStorage.removeItem(STORAGE_KEY); setState(initialState) }
