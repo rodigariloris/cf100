@@ -11,7 +11,12 @@ const SESSION_LENGTH_MS = 3 * 60 * 60 * 1000
 const publicSlug = new URLSearchParams(window.location.search).get('event')
 
 function loadLocalState() {
-  try { const saved = localStorage.getItem(STORAGE_KEY); return saved ? JSON.parse(saved) as CompetitionState : initialState }
+  try {
+    const saved = localStorage.getItem(STORAGE_KEY)
+    if (!saved) return initialState
+    const parsed = JSON.parse(saved) as CompetitionState
+    return { ...parsed, teams: parsed.teams.map((team) => ({ ...team, gender: team.gender ?? 'mixed', category: team.category ?? 'open' })) }
+  }
   catch { return initialState }
 }
 

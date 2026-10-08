@@ -30,6 +30,8 @@ function scoresAreTied(a: Score, b: Score, wod: Wod) {
 export function buildLeaderboard(state: CompetitionState): RankedTeam[] {
   const ranked: RankedTeam[] = state.teams.filter((team) => team.active).map((team) => ({
     ...team,
+    gender: team.gender ?? 'mixed',
+    category: team.category ?? 'open',
     totalPoints: 0,
     position: 0,
     eventWins: 0,
