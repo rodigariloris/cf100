@@ -1,6 +1,15 @@
 import { supabase } from './supabase'
 import type { CompetitionState, ScoreStatus, ScoreType, TeamCategory, TeamGender } from './types'
 
+export type CompetitionSummary = { id: string; name: string; date: string; location: string; status: CompetitionState['competition']['status'] }
+
+export async function listCompetitions(): Promise<CompetitionSummary[]> {
+  if (!supabase) throw new Error('Supabase is not configured')
+  const { data, error } = await supabase.from('competitions').select('id,name,event_date,location,status').order('event_date', { ascending: false })
+  if (error) throw error
+  return (data ?? []).map((competition) => ({ id: competition.id, name: competition.name, date: competition.event_date, location: competition.location, status: competition.status }))
+}
+
 export async function loadCompetition(idOrSlug: string, bySlug = false): Promise<CompetitionState> {
   if (!supabase) throw new Error('Supabase is not configured')
   const competitionQuery = supabase.from('competitions').select('*')

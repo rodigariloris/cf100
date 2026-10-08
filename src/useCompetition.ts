@@ -1,13 +1,15 @@
 import { useEffect, useRef, useState } from 'react'
 import type { Session } from '@supabase/supabase-js'
 import { initialState } from './data'
-import { createCompetition, loadCompetition, saveCompetition } from './remote'
+import { createCompetition, listCompetitions, loadCompetition, saveCompetition } from './remote'
+import type { CompetitionSummary } from './remote'
 import { supabase, supabaseConfigured } from './supabase'
 import type { CompetitionState } from './types'
 
 const STORAGE_KEY = 'cf100-competition-v1'
 const SESSION_DEADLINE_KEY = 'cf100-session-deadline'
 const SESSION_LENGTH_MS = 3 * 60 * 60 * 1000
+const SELECTED_COMPETITION_KEY = 'cf100-selected-competition'
 const publicSlug = new URLSearchParams(window.location.search).get('event')
 
 function loadLocalState() {
@@ -25,15 +27,25 @@ export function useCompetition() {
   const [session, setSession] = useState<Session | null>(null)
   const [loading, setLoading] = useState(supabaseConfigured)
   const [needsSetup, setNeedsSetup] = useState(false)
+  const [competitions, setCompetitions] = useState<CompetitionSummary[]>([])
   const [syncStatus, setSyncStatus] = useState<'local' | 'saving' | 'saved' | 'error'>(supabaseConfigured ? 'saved' : 'local')
   const [error, setError] = useState('')
   const suppressSave = useRef(true)
   const readOnly = Boolean(publicSlug)
 
   async function hydrate(id: string, bySlug = false) {
-    try { const remote = await loadCompetition(id, bySlug); suppressSave.current = true; setState(remote); setNeedsSetup(false); setError('') }
+    try { const remote = await loadCompetition(id, bySlug); suppressSave.current = true; setState(remote); if (!bySlug) localStorage.setItem(SELECTED_COMPETITION_KEY, id); setNeedsSetup(false); setError('') }
     catch (caught) { setError(caught instanceof Error ? caught.message : 'Could not load competition') }
     finally { setLoading(false) }
+  }
+
+  async function refreshCompetitions(preferredId?: string) {
+    const available = await listCompetitions()
+    setCompetitions(available)
+    const remembered = preferredId ?? localStorage.getItem(SELECTED_COMPETITION_KEY)
+    const selected = available.find((competition) => competition.id === remembered) ?? available.find((competition) => competition.status === 'live') ?? available[0]
+    if (selected) await hydrate(selected.id)
+    else { setNeedsSetup(true); setLoading(false) }
   }
 
   useEffect(() => {
@@ -47,11 +59,7 @@ export function useCompetition() {
   useEffect(() => {
     if (!supabase || publicSlug || !session) { if (supabaseConfigured && !publicSlug && !session) setLoading(false); return }
     setLoading(true)
-    void supabase.from('staff_members').select('competition_id').eq('user_id', session.user.id).limit(1).maybeSingle().then(({ data, error: membershipError }) => {
-      if (membershipError) { setError(membershipError.message); setLoading(false) }
-      else if (!data) { setNeedsSetup(true); setLoading(false) }
-      else void hydrate(data.competition_id)
-    })
+    void refreshCompetitions().catch((caught) => { setError(caught instanceof Error ? caught.message : 'Could not load competitions'); setLoading(false) })
   }, [session])
 
   useEffect(() => {
@@ -73,7 +81,7 @@ export function useCompetition() {
     if (readOnly || !session || !state.competition.id || needsSetup) return
     if (suppressSave.current) { suppressSave.current = false; return }
     setSyncStatus('saving')
-    const timer = window.setTimeout(() => { void saveCompetition(state).then(() => { setSyncStatus('saved'); setError('') }).catch((caught) => { setSyncStatus('error'); setError(caught instanceof Error ? caught.message : 'Save failed') }) }, 650)
+    const timer = window.setTimeout(() => { void saveCompetition(state).then(async () => { setSyncStatus('saved'); setError(''); const available = await listCompetitions(); setCompetitions(available) }).catch((caught) => { setSyncStatus('error'); setError(caught instanceof Error ? caught.message : 'Save failed') }) }, 650)
     return () => window.clearTimeout(timer)
   }, [state, session, needsSetup, readOnly])
 
@@ -86,7 +94,10 @@ export function useCompetition() {
 
   const signIn = async (email: string, password: string) => { if (!supabase) return 'Supabase is not configured'; const { error: signInError } = await supabase.auth.signInWithPassword({ email, password }); if (!signInError) localStorage.setItem(SESSION_DEADLINE_KEY, String(Date.now() + SESSION_LENGTH_MS)); return signInError ? 'Invalid email or password' : '' }
   const signOut = async () => { localStorage.removeItem(SESSION_DEADLINE_KEY); await supabase?.auth.signOut() }
-  const setupCompetition = async (name: string, date: string, location: string) => { const id = await createCompetition(name, date, location); await hydrate(id) }
+  const setupCompetition = async (name: string, date: string, location: string) => { const id = await createCompetition(name, date, location); await refreshCompetitions(id) }
+  const switchCompetition = async (id: string) => { setLoading(true); await hydrate(id) }
+  const startCompetitionSetup = () => setNeedsSetup(true)
+  const cancelCompetitionSetup = () => setNeedsSetup(false)
   const reset = () => { localStorage.removeItem(STORAGE_KEY); setState(initialState) }
-  return { state, setState, reset, session, loading, needsSetup, syncStatus, error, readOnly, remoteConfigured: supabaseConfigured, signIn, signOut, setupCompetition }
+  return { state, setState, reset, session, loading, needsSetup, competitions, syncStatus, error, readOnly, remoteConfigured: supabaseConfigured, signIn, signOut, setupCompetition, switchCompetition, startCompetitionSetup, cancelCompetitionSetup }
 }
